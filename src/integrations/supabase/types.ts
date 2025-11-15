@@ -14,7 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      emails: {
+        Row: {
+          action_required: boolean | null
+          body: string
+          category: string | null
+          confidence: number | null
+          created_at: string | null
+          date: string
+          from_email: string
+          id: string
+          priority: string | null
+          read: boolean | null
+          sentiment: string | null
+          starred: boolean | null
+          subject: string
+          summary: string | null
+          to_email: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          action_required?: boolean | null
+          body: string
+          category?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          date?: string
+          from_email: string
+          id?: string
+          priority?: string | null
+          read?: boolean | null
+          sentiment?: string | null
+          starred?: boolean | null
+          subject: string
+          summary?: string | null
+          to_email: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          action_required?: boolean | null
+          body?: string
+          category?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          date?: string
+          from_email?: string
+          id?: string
+          priority?: string | null
+          read?: boolean | null
+          sentiment?: string | null
+          starred?: boolean | null
+          subject?: string
+          summary?: string | null
+          to_email?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
