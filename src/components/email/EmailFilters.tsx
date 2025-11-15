@@ -12,13 +12,14 @@ import {
   Newspaper, 
   Users,
   Mail,
-  Filter
+  Filter,
+  Send
 } from "lucide-react";
 
 interface EmailFiltersProps {
-  selectedCategory: EmailCategory | 'all' | 'starred';
+  selectedCategory: EmailCategory | 'all' | 'starred' | 'sent';
   selectedPriority: EmailPriority | 'all';
-  onCategoryChange: (category: EmailCategory | 'all' | 'starred') => void;
+  onCategoryChange: (category: EmailCategory | 'all' | 'starred' | 'sent') => void;
   onPriorityChange: (priority: EmailPriority | 'all') => void;
   categoryCounts: Record<string, number>;
 }
@@ -30,9 +31,10 @@ export const EmailFilters = ({
   onPriorityChange,
   categoryCounts,
 }: EmailFiltersProps) => {
-  const categories: Array<{ value: EmailCategory | 'all' | 'starred'; label: string; icon: any }> = [
+  const categories: Array<{ value: EmailCategory | 'all' | 'starred' | 'sent'; label: string; icon: any }> = [
     { value: 'all', label: 'All Mail', icon: Inbox },
     { value: 'starred', label: 'Starred', icon: Star },
+    { value: 'sent', label: 'Sent', icon: Send },
     { value: 'urgent', label: 'Urgent', icon: AlertCircle },
     { value: 'important', label: 'Important', icon: Star },
     { value: 'work', label: 'Work', icon: Briefcase },
