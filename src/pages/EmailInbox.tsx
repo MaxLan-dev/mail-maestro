@@ -19,13 +19,12 @@ export const EmailInbox = () => {
   const [loading, setLoading] = useState(true);
   const [emails, setEmails] = useState<Email[]>([]);
   const [filteredEmails, setFilteredEmails] = useState<Email[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<EmailCategory | 'all' | 'starred'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<EmailCategory | 'all' | 'starred' | 'sent'>('all');
   const [selectedPriority, setSelectedPriority] = useState<EmailPriority | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isInserting, setIsInserting] = useState(false);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
-  const [emailView, setEmailView] = useState<'inbox' | 'sent'>('inbox');
   const { toast } = useToast();
 
   // Check authentication
@@ -44,19 +43,18 @@ export const EmailInbox = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch emails from database when user is authenticated or view changes
+  // Fetch emails from database when user is authenticated
   useEffect(() => {
     if (user) {
       fetchEmails();
     }
-  }, [user, emailView]);
+  }, [user]);
 
   const fetchEmails = async () => {
     try {
       const { data, error } = await supabase
         .from("emails")
         .select("*")
-        .eq("email_type", emailView)
         .order("date", { ascending: false });
 
       if (error) throw error;
@@ -154,7 +152,7 @@ export const EmailInbox = () => {
   // Apply filters to emails
   const applyFilters = (
     emailList: Email[],
-    category: EmailCategory | 'all' | 'starred',
+    category: EmailCategory | 'all' | 'starred' | 'sent',
     priority: EmailPriority | 'all',
     search: string
   ) => {
@@ -163,8 +161,13 @@ export const EmailInbox = () => {
     // Category filter
     if (category === 'starred') {
       filtered = filtered.filter(email => email.starred);
+    } else if (category === 'sent') {
+      filtered = filtered.filter(email => email.email_type === 'sent');
     } else if (category !== 'all') {
-      filtered = filtered.filter(email => email.category === category);
+      filtered = filtered.filter(email => email.category === category && email.email_type === 'inbox');
+    } else {
+      // 'all' shows inbox emails only by default
+      filtered = filtered.filter(email => email.email_type === 'inbox');
     }
 
     // Priority filter
@@ -191,7 +194,7 @@ export const EmailInbox = () => {
     applyFilters(emails, selectedCategory, selectedPriority, searchQuery);
   }, [emails, selectedCategory, selectedPriority, searchQuery]);
 
-  const handleCategoryChange = (category: EmailCategory | 'all' | 'starred') => {
+  const handleCategoryChange = (category: EmailCategory | 'all' | 'starred' | 'sent') => {
     setSelectedCategory(category);
   };
 
@@ -408,19 +411,15 @@ export const EmailInbox = () => {
             </Button>
           </div>
 
-          {emailView === 'inbox' && (
-            <>
-              <Separator />
+          <Separator />
 
-              <EmailFilters
-                selectedCategory={selectedCategory}
-                selectedPriority={selectedPriority}
-                onCategoryChange={handleCategoryChange}
-                onPriorityChange={handlePriorityChange}
-                categoryCounts={categoryCounts}
-              />
-            </>
-          )}
+          <EmailFilters
+            selectedCategory={selectedCategory}
+            selectedPriority={selectedPriority}
+            onCategoryChange={handleCategoryChange}
+            onPriorityChange={handlePriorityChange}
+            categoryCounts={categoryCounts}
+          />
         </div>
       </div>
 
@@ -429,36 +428,10 @@ export const EmailInbox = () => {
         {/* Header */}
         <div className="border-b border-border bg-card p-6">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-foreground">
-              {emailView === 'inbox' ? 'Email Inbox' : 'Sent Emails'}
-            </h1>
+            <h1 className="text-3xl font-bold text-foreground">Email Inbox</h1>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>{filteredEmails.length} emails</span>
             </div>
-          </div>
-
-          {/* Inbox/Sent Tabs */}
-          <div className="flex gap-2 mb-4">
-            <Button
-              variant={emailView === 'inbox' ? 'default' : 'outline'}
-              onClick={() => {
-                setEmailView('inbox');
-                setSelectedCategory('all');
-                setSelectedPriority('all');
-              }}
-            >
-              Inbox
-            </Button>
-            <Button
-              variant={emailView === 'sent' ? 'default' : 'outline'}
-              onClick={() => {
-                setEmailView('sent');
-                setSelectedCategory('all');
-                setSelectedPriority('all');
-              }}
-            >
-              Sent
-            </Button>
           </div>
 
           {/* Search Bar */}
@@ -480,9 +453,9 @@ export const EmailInbox = () => {
               <div className="text-center py-12">
                 <p className="text-muted-foreground">
                   {emails.length === 0 
-                    ? emailView === 'inbox' 
-                      ? "No emails yet. Compose a new email to get started!"
-                      : "No sent emails yet."
+                    ? selectedCategory === 'sent'
+                      ? "No sent emails yet."
+                      : "No emails yet. Compose a new email to get started!"
                     : "No emails match your filters."}
                 </p>
               </div>

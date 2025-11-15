@@ -22,6 +22,7 @@ export interface Email {
   date: Date;
   read: boolean;
   starred: boolean;
+  email_type?: 'inbox' | 'sent';
   // AI-generated fields
   summary?: string;
   category?: EmailCategory;
