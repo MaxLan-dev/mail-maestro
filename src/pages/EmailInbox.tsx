@@ -7,10 +7,11 @@ import { EmailCard } from "@/components/email/EmailCard";
 import { EmailFilters } from "@/components/email/EmailFilters";
 import { supabase } from "@/integrations/supabase/client";
 import type { Email, EmailCategory, EmailPriority } from "@/types/email";
-import { Search, Loader2, Sparkles, LogOut } from "lucide-react";
+import { Search, Loader2, Sparkles, LogOut, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ComposeEmail } from "@/components/email/ComposeEmail";
 import { AuthForm } from "@/components/auth/AuthForm";
+import { mockEmails } from "@/data/mockEmails";
 
 export const EmailInbox = () => {
   const [user, setUser] = useState<any>(null);
@@ -21,6 +22,7 @@ export const EmailInbox = () => {
   const [selectedPriority, setSelectedPriority] = useState<EmailPriority | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isInserting, setIsInserting] = useState(false);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
@@ -274,6 +276,53 @@ export const EmailInbox = () => {
     }
   };
 
+  const handleInsertTestEmails = async () => {
+    setIsInserting(true);
+    toast({
+      title: "Inserting test emails...",
+      description: "Adding 30 test emails to your inbox.",
+    });
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Prepare test emails for insertion
+      const testEmailsData = mockEmails.map((email) => ({
+        user_id: user.id,
+        from_email: email.from,
+        to_email: email.to,
+        subject: email.subject,
+        body: email.body,
+        date: new Date(email.date).toISOString(),
+        read: email.read,
+        starred: email.starred,
+      }));
+
+      const { error: insertError } = await supabase
+        .from("emails")
+        .insert(testEmailsData);
+
+      if (insertError) throw insertError;
+
+      // Refresh the email list
+      await fetchEmails();
+
+      toast({
+        title: "Success!",
+        description: "30 test emails have been added to your inbox.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to insert test emails: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsInserting(false);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast({
@@ -301,6 +350,19 @@ export const EmailInbox = () => {
         <div className="space-y-6">
           <div className="space-y-2">
             <ComposeEmail onEmailSent={fetchEmails} />
+            <Button 
+              onClick={handleInsertTestEmails}
+              disabled={isInserting}
+              className="w-full"
+              variant="outline"
+            >
+              {isInserting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Database className="mr-2 h-4 w-4" />
+              )}
+              {isInserting ? "Adding..." : "Add 30 Test Emails"}
+            </Button>
             <Button 
               onClick={analyzeAllEmails}
               disabled={isAnalyzing}
