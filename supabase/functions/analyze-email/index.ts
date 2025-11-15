@@ -73,7 +73,15 @@ Priority Guidelines:
 
 Meeting Detection:
 - Detect if the email contains meeting/event information
-- Extract meeting details: title, start time, end time, location, attendees`;
+- Extract meeting details: title, start time, end time, location, attendees
+
+Task Extraction:
+- Identify actionable items that require someone to DO something
+- Extract clear action items with titles like "Review document", "Submit report", "Call client"
+- Infer due dates from phrases like "by Friday", "end of week", "ASAP", "within 3 days"
+- Identify assignees from mentions like "John should...", "please have Sarah...", "you need to..."
+- Set urgency based on email priority and language (urgent words, deadlines, importance)
+- Each task should be specific and actionable`;
 
         const userPrompt = `Analyze this email:
 
@@ -127,6 +135,22 @@ Body: ${email.body}`;
                           endTime: { type: 'string', description: 'ISO 8601 datetime' },
                           location: { type: 'string' },
                           attendees: { type: 'array', items: { type: 'string' } }
+                        }
+                      },
+                      hasTasks: { type: 'boolean', description: 'Whether email contains actionable tasks' },
+                      tasks: {
+                        type: 'array',
+                        description: 'Extracted tasks if hasTasks is true',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            title: { type: 'string', description: 'Short action item title' },
+                            description: { type: 'string', description: 'Snippet from email explaining the task' },
+                            dueDate: { type: 'string', description: 'ISO 8601 datetime if due date mentioned or can be inferred, null otherwise' },
+                            assignee: { type: 'string', description: 'Person assigned if mentioned, null otherwise' },
+                            urgency: { type: 'string', enum: ['critical', 'high', 'medium', 'low'], description: 'Task urgency based on email priority and content' }
+                          },
+                          required: ['title', 'urgency']
                         }
                       }
                     },
@@ -198,6 +222,35 @@ Body: ${email.body}`;
               }
             } catch (calError) {
               console.error(`Error creating calendar event:`, calError);
+            }
+          }
+
+          // Create tasks if detected
+          if (analysis.hasTasks && analysis.tasks && analysis.tasks.length > 0) {
+            try {
+              const tasksToInsert = analysis.tasks.map((task: any) => ({
+                user_id: email.user_id,
+                email_id: email.id,
+                title: task.title,
+                description: task.description || email.body.substring(0, 300),
+                due_date: task.dueDate || null,
+                assignee: task.assignee || null,
+                urgency: task.urgency,
+                ai_confidence: analysis.confidence,
+                status: 'pending'
+              }));
+
+              const { error: tasksError } = await supabaseClient
+                .from('tasks')
+                .insert(tasksToInsert);
+
+              if (tasksError) {
+                console.error(`Failed to create tasks for email ${email.id}:`, tasksError);
+              } else {
+                console.log(`Created ${tasksToInsert.length} task(s) for email ${email.id}`);
+              }
+            } catch (taskError) {
+              console.error(`Error creating tasks:`, taskError);
             }
           }
 
