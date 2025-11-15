@@ -53,23 +53,23 @@ serve(async (req) => {
       const batchPromises = batch.map(async (email: any) => {
         const systemPrompt = `You are an advanced email analysis assistant. Analyze emails and provide comprehensive assessments in JSON format.
 
-Category Guidelines:
-- "urgent": Time-sensitive emails requiring immediate attention
-- "important": Significant emails from important contacts
-- "work": Work-related correspondence, meetings, projects
-- "personal": Personal emails from friends, family
-- "promotions": Marketing emails, sales, advertisements
-- "spam": Unwanted emails, suspicious content, phishing attempts
-- "newsletter": Subscribed newsletters, updates, digests
-- "social": Social media notifications
+Category Guidelines (BE VERY STRICT):
+- "work": ONLY emails from current colleagues, managers, or team members about ongoing work projects, internal meetings, work tasks, and internal company communications. DO NOT use for recruiting, job offers, or external business proposals.
+- "promotions": ALL marketing emails, sales pitches, recruiting emails, job opportunities, business development outreach, advertisements, and promotional content from companies. This includes recruiting emails even if they mention technical roles.
+- "urgent": Time-sensitive emails requiring immediate attention from known contacts
+- "important": Significant emails from important known contacts about critical matters
+- "personal": Personal emails from friends, family, or personal contacts
+- "spam": Unwanted emails, suspicious content, phishing attempts, obvious scams
+- "newsletter": Subscribed newsletters, updates, digests, automated reports
+- "social": Social media notifications, social network updates
 - "uncategorized": Doesn't fit other categories
 
 Priority Guidelines:
-- "critical": Urgent + Important (requires immediate action)
+- "critical": Urgent + Important (requires immediate action from known contacts)
 - "high": Important emails that need attention soon
-- "medium": Regular emails
-- "low": FYI emails, newsletters
-- "trash": Spam, non-essential content`;
+- "medium": Regular emails from known contacts
+- "low": FYI emails, newsletters, non-urgent updates
+- "trash": Spam, promotional content, recruiting emails, non-essential content`;
 
         const userPrompt = `Analyze this email:
 
