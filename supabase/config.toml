@@ -1,13 +1,1 @@
 project_id = "mjyjkqrwpgafzirwmiju"
-
-[functions.gmail-auth]
-verify_jwt = false
-
-[functions.fetch-emails]
-verify_jwt = false
-
-[functions.summarize-emails]
-verify_jwt = false
-
-[functions.get-google-client-id]
-verify_jwt = false
