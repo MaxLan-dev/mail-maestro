@@ -1,94 +1,132 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { EmailCard, Email } from "@/components/EmailCard";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { Mail, Sparkles, RefreshCw } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Index = () => {
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+  const [accessToken, setAccessToken] = useState<string>("");
+  const [googleClientId, setGoogleClientId] = useState<string>("");
 
-  // Mock data for demonstration
-  const mockEmails: Email[] = [
-    {
-      id: "1",
-      from: "John Doe",
-      subject: "Q4 Budget Review Meeting",
-      snippet: "Hi team, I'd like to schedule a meeting to review our Q4 budget allocations...",
-      date: "2h ago",
-      category: "Work",
-      summary: "Meeting request to review Q4 budget with the team",
-      isRead: false,
-    },
-    {
-      id: "2",
-      from: "Sarah Smith",
-      subject: "Weekend Plans",
-      snippet: "Hey! Are you free this weekend? I was thinking we could...",
-      date: "5h ago",
-      category: "Personal",
-      summary: "Casual weekend hangout invitation from a friend",
-      isRead: false,
-    },
-    {
-      id: "3",
-      from: "Bank of America",
-      subject: "Your Monthly Statement is Ready",
-      snippet: "Your statement for November 2024 is now available...",
-      date: "1d ago",
-      category: "Finance",
-      summary: "Monthly bank statement notification with account summary",
-      isRead: true,
-    },
-    {
-      id: "4",
-      from: "TechCrunch Newsletter",
-      subject: "The latest in AI and startups",
-      snippet: "Today's top stories: New AI breakthrough, funding rounds...",
-      date: "2d ago",
-      category: "Newsletter",
-      summary: "Tech news digest covering AI developments and startup funding",
-      isRead: true,
-    },
-  ];
+  // Fetch Google Client ID on mount
+  useEffect(() => {
+    const fetchClientId = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-google-client-id');
+        if (error) throw error;
+        setGoogleClientId(data.clientId);
+      } catch (error) {
+        console.error('Failed to fetch Google Client ID:', error);
+        toast.error('Failed to initialize Gmail connection');
+      }
+    };
+    
+    fetchClientId();
+  }, []);
 
-  const handleConnectGmail = async () => {
-    setIsLoading(true);
+  // Check for OAuth callback on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code && !accessToken) {
+      handleAuthCallback(code);
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  const handleAuthCallback = async (code: string) => {
     try {
-      // TODO: Implement Gmail OAuth connection
-      toast({
-        title: "Gmail Connection",
-        description: "Gmail OAuth integration coming soon!",
-      });
+      setIsLoading(true);
+      toast.loading('Connecting to Gmail...');
       
-      // For now, load mock data
-      setTimeout(() => {
-        setEmails(mockEmails);
-        setIsLoading(false);
-        toast({
-          title: "Success",
-          description: "Loaded sample emails with AI summaries!",
-        });
-      }, 1000);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to connect to Gmail",
-        variant: "destructive",
+      const redirectUri = `${window.location.origin}/`;
+      
+      const { data, error } = await supabase.functions.invoke('gmail-auth', {
+        body: { code, redirectUri }
       });
+
+      if (error) throw error;
+      
+      setAccessToken(data.accessToken);
+      toast.dismiss();
+      toast.success('Successfully connected to Gmail!');
+      
+      // Auto-fetch emails after connection
+      await fetchEmails(data.accessToken);
+    } catch (error: any) {
+      console.error('Auth error:', error);
+      toast.dismiss();
+      toast.error('Failed to connect to Gmail: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConnectGmail = () => {
+    if (!googleClientId) {
+      toast.error('Gmail connection not initialized');
+      return;
+    }
+    
+    const redirectUri = `${window.location.origin}/`;
+    const scope = 'https://www.googleapis.com/auth/gmail.readonly';
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
+    
+    window.location.href = authUrl;
+  };
+
+  const fetchEmails = async (token?: string) => {
+    const tokenToUse = token || accessToken;
+    if (!tokenToUse) {
+      toast.error('Please connect to Gmail first');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      toast.loading('Fetching emails...');
+
+      const { data: fetchData, error: fetchError } = await supabase.functions.invoke('fetch-emails', {
+        body: { accessToken: tokenToUse, maxResults: 20 }
+      });
+
+      if (fetchError) throw fetchError;
+
+      toast.dismiss();
+      
+      if (!fetchData.emails || fetchData.emails.length === 0) {
+        toast.info('No emails found');
+        return;
+      }
+
+      toast.loading('Analyzing emails with AI...');
+
+      const { data: summarizeData, error: summarizeError } = await supabase.functions.invoke('summarize-emails', {
+        body: { emails: fetchData.emails }
+      });
+
+      if (summarizeError) throw summarizeError;
+
+      setEmails(summarizeData.summarizedEmails);
+      toast.dismiss();
+      toast.success(`Successfully processed ${summarizeData.summarizedEmails.length} emails!`);
+    } catch (error: any) {
+      console.error('Fetch error:', error);
+      toast.dismiss();
+      toast.error('Failed to fetch emails: ' + error.message);
+    } finally {
       setIsLoading(false);
     }
   };
 
   const handleRefresh = () => {
-    setEmails(mockEmails);
-    toast({
-      title: "Refreshed",
-      description: "Email list updated",
-    });
+    fetchEmails();
   };
 
   const categories = Array.from(new Set(emails.map((e) => e.category).filter(Boolean))) as string[];
@@ -178,10 +216,7 @@ const Index = () => {
                   key={email.id}
                   email={email}
                   onClick={() => {
-                    toast({
-                      title: "Email Details",
-                      description: "Full email view coming soon!",
-                    });
+                    toast.info("Full email view coming soon!");
                   }}
                 />
               ))}
