@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { EmailCard, Email } from "@/components/EmailCard";
@@ -226,6 +227,7 @@ const Index = () => {
       </div>
     </div>
   );
+
 };
 
 export default Index;
