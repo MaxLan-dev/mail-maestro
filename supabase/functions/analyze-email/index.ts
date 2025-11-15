@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,14 +13,38 @@ serve(async (req) => {
   }
 
   try {
-    const { emails } = await req.json();
+    const { emailIds } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const analyzedEmails = [];
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Supabase configuration missing');
+    }
+
+    // Create Supabase client
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Fetch emails from database
+    const { data: emails, error: fetchError } = await supabaseClient
+      .from('emails')
+      .select('*')
+      .in('id', emailIds);
+
+    if (fetchError) {
+      console.error('Error fetching emails:', fetchError);
+      throw fetchError;
+    }
+
+    if (!emails || emails.length === 0) {
+      throw new Error('No emails found with provided IDs');
+    }
+
+    console.log(`Analyzing ${emails.length} emails...`);
 
     // Process emails in batches of 5
     for (let i = 0; i < emails.length; i += 5) {
@@ -48,7 +73,7 @@ Priority Guidelines:
 
         const userPrompt = `Analyze this email:
 
-From: ${email.from}
+From: ${email.from_email}
 Subject: ${email.subject}
 Body: ${email.body}`;
 
@@ -101,11 +126,11 @@ Body: ${email.body}`;
           if (!response.ok) {
             const errorText = await response.text();
             console.error('Lovable AI error:', response.status, errorText);
-            throw new Error('Failed to analyze email');
+            throw new Error(`AI request failed: ${response.status}`);
           }
 
-          const data = await response.json();
-          const toolCall = data.choices[0]?.message?.tool_calls?.[0];
+          const result = await response.json();
+          const toolCall = result.choices[0]?.message?.tool_calls?.[0];
           
           if (!toolCall) {
             throw new Error('No tool call in response');
@@ -113,50 +138,54 @@ Body: ${email.body}`;
 
           const analysis = JSON.parse(toolCall.function.arguments);
 
-          return {
-            id: email.id,
-            ...email,
-            summary: analysis.summary || 'No summary available',
-            category: analysis.category || 'uncategorized',
-            priority: analysis.priority || 'medium',
-            sentiment: analysis.sentiment || 'neutral',
-            actionRequired: Boolean(analysis.actionRequired),
-            confidence: typeof analysis.confidence === 'number' ? analysis.confidence : 0.8,
-          };
+          // Update email in database
+          const { error: updateError } = await supabaseClient
+            .from('emails')
+            .update({
+              summary: analysis.summary,
+              category: analysis.category,
+              priority: analysis.priority,
+              sentiment: analysis.sentiment,
+              action_required: analysis.actionRequired,
+              confidence: analysis.confidence
+            })
+            .eq('id', email.id);
+
+          if (updateError) {
+            console.error(`Failed to update email ${email.id}:`, updateError);
+          } else {
+            console.log(`Successfully analyzed email ${email.id}`);
+          }
+
+          return { id: email.id, success: true };
         } catch (error) {
           console.error(`Error analyzing email ${email.id}:`, error);
-          return {
-            id: email.id,
-            ...email,
-            summary: 'Unable to analyze email',
-            category: 'uncategorized',
-            priority: 'medium',
-            sentiment: 'neutral',
-            actionRequired: false,
-            confidence: 0.5,
-          };
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          return { id: email.id, success: false, error: errorMessage };
         }
       });
 
-      const batchResults = await Promise.all(batchPromises);
-      analyzedEmails.push(...batchResults);
-
-      // Small delay between batches
-      if (i + 5 < emails.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      await Promise.all(batchPromises);
     }
 
-    return new Response(JSON.stringify({ analyzedEmails }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ 
+        success: true,
+        message: `Successfully analyzed ${emails.length} emails`
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
+    );
   } catch (error) {
     console.error('Error in analyze-email function:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      {
-        status: 500,
+      JSON.stringify({ error: errorMessage }),
+      { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
       }
     );
   }
