@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CategoryBadge } from "./CategoryBadge";
+import { EmailResponseDialog } from "./EmailResponseDialog";
 import type { Email } from "@/types/email";
 import { 
   Mail, 
@@ -25,10 +26,12 @@ interface EmailCardProps {
   onToggleRead?: (emailId: string) => void;
   onToggleStar?: (emailId: string) => void;
   onDelete?: (emailId: string) => void;
+  onEmailSent?: () => void;
 }
 
-export const EmailCard = ({ email, onToggleRead, onToggleStar, onDelete }: EmailCardProps) => {
+export const EmailCard = ({ email, onToggleRead, onToggleStar, onDelete, onEmailSent }: EmailCardProps) => {
   const [expanded, setExpanded] = useState(false);
+  const [responseDialogOpen, setResponseDialogOpen] = useState(false);
 
   const getSentimentColor = (sentiment?: string) => {
     switch (sentiment) {
@@ -169,9 +172,14 @@ export const EmailCard = ({ email, onToggleRead, onToggleStar, onDelete }: Email
         {/* Action Buttons */}
         <Separator />
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2"
+            onClick={() => setResponseDialogOpen(true)}
+          >
             <Reply className="h-4 w-4" />
-            Reply
+            AI Reply
           </Button>
           <Button variant="outline" size="sm" className="gap-2">
             <Forward className="h-4 w-4" />
@@ -179,6 +187,15 @@ export const EmailCard = ({ email, onToggleRead, onToggleStar, onDelete }: Email
           </Button>
         </div>
       </CardContent>
+
+      <EmailResponseDialog
+        open={responseDialogOpen}
+        onOpenChange={setResponseDialogOpen}
+        emailId={email.id}
+        emailSubject={email.subject}
+        emailFrom={email.from}
+        onSent={onEmailSent}
+      />
     </Card>
   );
 };

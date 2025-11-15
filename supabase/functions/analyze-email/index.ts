@@ -69,7 +69,11 @@ Priority Guidelines:
 - "high": Important emails that need attention soon
 - "medium": Regular emails from known contacts
 - "low": FYI emails, newsletters, non-urgent updates
-- "trash": Spam, promotional content, recruiting emails, non-essential content`;
+- "trash": Spam, promotional content, recruiting emails, non-essential content
+
+Meeting Detection:
+- Detect if the email contains meeting/event information
+- Extract meeting details: title, start time, end time, location, attendees`;
 
         const userPrompt = `Analyze this email:
 
@@ -112,7 +116,19 @@ Body: ${email.body}`;
                         enum: ['positive', 'neutral', 'negative']
                       },
                       actionRequired: { type: 'boolean' },
-                      confidence: { type: 'number', description: 'Confidence score 0-1' }
+                      confidence: { type: 'number', description: 'Confidence score 0-1' },
+                      hasMeeting: { type: 'boolean', description: 'Whether email contains meeting/event information' },
+                      meetingDetails: {
+                        type: 'object',
+                        description: 'Meeting details if hasMeeting is true',
+                        properties: {
+                          title: { type: 'string' },
+                          startTime: { type: 'string', description: 'ISO 8601 datetime' },
+                          endTime: { type: 'string', description: 'ISO 8601 datetime' },
+                          location: { type: 'string' },
+                          attendees: { type: 'array', items: { type: 'string' } }
+                        }
+                      }
                     },
                     required: ['summary', 'category', 'priority', 'sentiment', 'actionRequired', 'confidence'],
                     additionalProperties: false
@@ -155,6 +171,34 @@ Body: ${email.body}`;
             console.error(`Failed to update email ${email.id}:`, updateError);
           } else {
             console.log(`Successfully analyzed email ${email.id}`);
+          }
+
+          // Create calendar event if meeting detected
+          if (analysis.hasMeeting && analysis.meetingDetails) {
+            const meetingData = analysis.meetingDetails;
+            try {
+              const { error: calendarError } = await supabaseClient
+                .from('calendar_events')
+                .insert({
+                  user_id: email.user_id,
+                  email_id: email.id,
+                  title: meetingData.title || email.subject,
+                  description: email.body,
+                  start_time: meetingData.startTime,
+                  end_time: meetingData.endTime,
+                  location: meetingData.location || '',
+                  attendees: meetingData.attendees || [],
+                  status: 'pending'
+                });
+
+              if (calendarError) {
+                console.error(`Failed to create calendar event for email ${email.id}:`, calendarError);
+              } else {
+                console.log(`Created calendar event for email ${email.id}`);
+              }
+            } catch (calError) {
+              console.error(`Error creating calendar event:`, calError);
+            }
           }
 
           return { id: email.id, success: true };
