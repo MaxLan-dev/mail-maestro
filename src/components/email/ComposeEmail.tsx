@@ -38,6 +38,7 @@ export const ComposeEmail = ({ onEmailSent }: ComposeEmailProps) => {
           subject,
           body,
           date: new Date().toISOString(),
+          email_type: 'sent',
         })
         .select()
         .single();
