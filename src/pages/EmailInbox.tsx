@@ -5,13 +5,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { EmailCard } from "@/components/email/EmailCard";
 import { EmailFilters } from "@/components/email/EmailFilters";
-import { mockEmails } from "@/data/mockEmails";
 import { supabase } from "@/integrations/supabase/client";
 import type { Email, EmailCategory, EmailPriority } from "@/types/email";
-import { RefreshCw, Search, Loader2, Sparkles } from "lucide-react";
+import { Search, Loader2, Sparkles, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ComposeEmail } from "@/components/email/ComposeEmail";
+import { AuthForm } from "@/components/auth/AuthForm";
 
 export const EmailInbox = () => {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [emails, setEmails] = useState<Email[]>([]);
   const [filteredEmails, setFilteredEmails] = useState<Email[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<EmailCategory | 'all' | 'starred'>('all');
@@ -21,51 +24,105 @@ export const EmailInbox = () => {
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
-  // Initialize emails with mock data
+  // Check authentication
   useEffect(() => {
-    const initialEmails = mockEmails.map(email => ({
-      ...email,
-      summary: undefined,
-      category: 'uncategorized' as EmailCategory,
-      priority: 'medium' as EmailPriority,
-      sentiment: 'neutral' as const,
-      actionRequired: false,
-      confidence: 0,
-    }));
-    setEmails(initialEmails);
-    setFilteredEmails(initialEmails);
-    updateCategoryCounts(initialEmails);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Analyze all emails with Gemini AI
+  // Fetch emails from database when user is authenticated
+  useEffect(() => {
+    if (user) {
+      fetchEmails();
+    }
+  }, [user]);
+
+  const fetchEmails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("emails")
+        .select("*")
+        .order("date", { ascending: false });
+
+      if (error) throw error;
+
+      const emailsWithDates = (data || []).map((email: any) => ({
+        id: email.id,
+        from: email.from_email,
+        to: email.to_email,
+        subject: email.subject,
+        body: email.body,
+        date: new Date(email.date),
+        read: email.read,
+        starred: email.starred,
+        summary: email.summary,
+        category: (email.category || 'uncategorized') as EmailCategory,
+        priority: (email.priority || 'medium') as EmailPriority,
+        sentiment: (email.sentiment || 'neutral') as 'positive' | 'neutral' | 'negative',
+        actionRequired: email.action_required || false,
+        confidence: email.confidence ? parseFloat(email.confidence) : 0,
+      }));
+
+      setEmails(emailsWithDates);
+      setFilteredEmails(emailsWithDates);
+      updateCategoryCounts(emailsWithDates);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch emails: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Analyze all emails with AI
   const analyzeAllEmails = async () => {
+    if (emails.length === 0) {
+      toast({
+        title: "No emails",
+        description: "Add some emails first before analyzing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsAnalyzing(true);
     toast({
       title: "Analyzing emails...",
-      description: "Using Gemini AI to categorize and summarize your emails.",
+      description: "Using AI to categorize and summarize your emails.",
     });
 
     try {
-      const { data, error } = await supabase.functions.invoke('analyze-email', {
-        body: { emails }
+      const emailIds = emails.map(e => e.id);
+
+      const { error } = await supabase.functions.invoke('analyze-email', {
+        body: { emailIds }
       });
 
       if (error) throw error;
 
-      const analyzedEmails = data.analyzedEmails;
-      setEmails(analyzedEmails);
-      applyFilters(analyzedEmails, selectedCategory, selectedPriority, searchQuery);
-      updateCategoryCounts(analyzedEmails);
+      // Refresh emails from database after analysis
+      await fetchEmails();
 
       toast({
         title: "Analysis complete!",
-        description: `Successfully analyzed ${analyzedEmails.length} emails.`,
+        description: `Successfully analyzed ${emails.length} emails.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to analyze emails:', error);
       toast({
         title: "Analysis failed",
-        description: "There was an error analyzing your emails. Please try again.",
+        description: error.message || "There was an error analyzing your emails. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -117,144 +174,212 @@ export const EmailInbox = () => {
         email =>
           email.subject.toLowerCase().includes(query) ||
           email.from.toLowerCase().includes(query) ||
-          email.body.toLowerCase().includes(query) ||
-          email.summary?.toLowerCase().includes(query)
+          email.body.toLowerCase().includes(query)
       );
     }
 
     setFilteredEmails(filtered);
   };
 
-  // Handle filter changes
+  // Apply filters when dependencies change
   useEffect(() => {
     applyFilters(emails, selectedCategory, selectedPriority, searchQuery);
-  }, [selectedCategory, selectedPriority, searchQuery, emails]);
+  }, [emails, selectedCategory, selectedPriority, searchQuery]);
 
-  // Email actions
-  const handleToggleRead = (emailId: string) => {
-    setEmails(prev =>
-      prev.map(email =>
-        email.id === emailId ? { ...email, read: !email.read } : email
-      )
-    );
+  const handleCategoryChange = (category: EmailCategory | 'all' | 'starred') => {
+    setSelectedCategory(category);
   };
 
-  const handleToggleStar = (emailId: string) => {
-    setEmails(prev =>
-      prev.map(email =>
-        email.id === emailId ? { ...email, starred: !email.starred } : email
-      )
-    );
+  const handlePriorityChange = (priority: EmailPriority | 'all') => {
+    setSelectedPriority(priority);
   };
 
-  const handleDelete = (emailId: string) => {
-    setEmails(prev => prev.filter(email => email.id !== emailId));
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleToggleRead = async (id: string) => {
+    const email = emails.find(e => e.id === id);
+    if (!email) return;
+
+    try {
+      const { error } = await supabase
+        .from("emails")
+        .update({ read: !email.read })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setEmails(emails.map(e => 
+        e.id === id ? { ...e, read: !e.read } : e
+      ));
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update email",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleStar = async (id: string) => {
+    const email = emails.find(e => e.id === id);
+    if (!email) return;
+
+    try {
+      const { error } = await supabase
+        .from("emails")
+        .update({ starred: !email.starred })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      const updatedEmails = emails.map(e => 
+        e.id === id ? { ...e, starred: !e.starred } : e
+      );
+      setEmails(updatedEmails);
+      updateCategoryCounts(updatedEmails);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update email",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("emails")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      const updatedEmails = emails.filter(e => e.id !== id);
+      setEmails(updatedEmails);
+      updateCategoryCounts(updatedEmails);
+      
+      toast({
+        title: "Email Deleted",
+        description: "The email has been moved to trash.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to delete email",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     toast({
-      title: "Email deleted",
-      description: "The email has been moved to trash.",
+      title: "Logged out",
+      description: "You have been logged out successfully.",
     });
   };
 
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthForm />;
+  }
+
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar with filters */}
-      <div className="w-64 border-r bg-gray-50/50 dark:bg-gray-900/50 p-4">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-purple-600" />
-            Mail Maestro
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            AI-Powered Email
-          </p>
-        </div>
+      {/* Sidebar */}
+      <div className="w-64 border-r border-border bg-card p-6 overflow-y-auto">
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <ComposeEmail onEmailSent={fetchEmails} />
+            <Button 
+              onClick={analyzeAllEmails}
+              disabled={isAnalyzing}
+              className="w-full"
+              variant="secondary"
+            >
+              {isAnalyzing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              {isAnalyzing ? "Analyzing..." : "Analyze All"}
+            </Button>
+            <Button 
+              onClick={handleLogout}
+              variant="outline"
+              className="w-full"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
 
-        <Button
-          onClick={analyzeAllEmails}
-          disabled={isAnalyzing}
-          className="w-full mb-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-        >
-          {isAnalyzing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Analyze with AI
-            </>
-          )}
-        </Button>
+          <Separator />
 
-        <Separator className="my-4" />
-
-        <ScrollArea className="h-[calc(100vh-240px)]">
           <EmailFilters
             selectedCategory={selectedCategory}
             selectedPriority={selectedPriority}
-            onCategoryChange={setSelectedCategory}
-            onPriorityChange={setSelectedPriority}
+            onCategoryChange={handleCategoryChange}
+            onPriorityChange={handlePriorityChange}
             categoryCounts={categoryCounts}
           />
-        </ScrollArea>
+        </div>
       </div>
 
-      {/* Main content area */}
+      {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="border-b p-4 bg-white dark:bg-gray-950">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search emails..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+        <div className="border-b border-border bg-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl font-bold text-foreground">Email Inbox</h1>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>{filteredEmails.length} emails</span>
             </div>
-            <Button variant="outline" size="icon">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search emails..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="pl-9"
+            />
           </div>
         </div>
 
-        {/* Email list */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4 max-w-5xl mx-auto">
+        {/* Email List */}
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-3">
             {filteredEmails.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-500 dark:text-gray-400">
-                  No emails found matching your filters.
+                <p className="text-muted-foreground">
+                  {emails.length === 0 
+                    ? "No emails yet. Compose a new email to get started!"
+                    : "No emails match your filters."}
                 </p>
               </div>
             ) : (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {filteredEmails.length} {filteredEmails.length === 1 ? 'email' : 'emails'}
-                  </p>
-                  {selectedCategory !== 'all' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedCategory('all')}
-                    >
-                      Clear filters
-                    </Button>
-                  )}
-                </div>
-                {filteredEmails.map(email => (
-                  <EmailCard
-                    key={email.id}
-                    email={email}
-                    onToggleRead={handleToggleRead}
-                    onToggleStar={handleToggleStar}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </>
+              filteredEmails.map((email) => (
+                <EmailCard
+                  key={email.id}
+                  email={email}
+                  onToggleRead={handleToggleRead}
+                  onToggleStar={handleToggleStar}
+                  onDelete={handleDelete}
+                />
+              ))
             )}
           </div>
         </ScrollArea>
@@ -262,6 +387,3 @@ export const EmailInbox = () => {
     </div>
   );
 };
-
-export default EmailInbox;
-
