@@ -7,11 +7,12 @@ import { EmailCard } from "@/components/email/EmailCard";
 import { EmailFilters } from "@/components/email/EmailFilters";
 import { supabase } from "@/integrations/supabase/client";
 import type { Email, EmailCategory, EmailPriority } from "@/types/email";
-import { Search, Loader2, Sparkles, LogOut, Database } from "lucide-react";
+import { Search, Loader2, Sparkles, LogOut, Database, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ComposeEmail } from "@/components/email/ComposeEmail";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { mockEmails } from "@/data/mockEmails";
+import { Link } from "react-router-dom";
 
 export const EmailInbox = () => {
   const [user, setUser] = useState<any>(null);
@@ -376,6 +377,15 @@ export const EmailInbox = () => {
               )}
               {isAnalyzing ? "Analyzing..." : "Analyze All"}
             </Button>
+            <Link to="/calendar" className="block">
+              <Button 
+                variant="outline"
+                className="w-full"
+              >
+                <Calendar className="mr-2 h-4 w-4" />
+                Calendar
+              </Button>
+            </Link>
             <Button 
               onClick={handleLogout}
               variant="outline"
@@ -440,6 +450,7 @@ export const EmailInbox = () => {
                   onToggleRead={handleToggleRead}
                   onToggleStar={handleToggleStar}
                   onDelete={handleDelete}
+                  onEmailSent={fetchEmails}
                 />
               ))
             )}
