@@ -68,6 +68,7 @@ export const EmailInbox = () => {
         date: new Date(email.date),
         read: email.read,
         starred: email.starred,
+        email_type: (email.email_type || 'inbox') as 'inbox' | 'sent',
         summary: email.summary,
         category: (email.category || 'uncategorized') as EmailCategory,
         priority: (email.priority || 'medium') as EmailPriority,
