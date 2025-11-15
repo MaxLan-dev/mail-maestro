@@ -13,10 +13,10 @@ serve(async (req) => {
 
   try {
     const { emails } = await req.json();
-    const GEMINI_API = Deno.env.get('GEMINI_API');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
-    if (!GEMINI_API) {
-      throw new Error('GEMINI_API key not configured');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
     const analyzedEmails = [];
@@ -26,24 +26,7 @@ serve(async (req) => {
       const batch = emails.slice(i, i + 5);
       
       const batchPromises = batch.map(async (email: any) => {
-        const prompt = `You are an advanced email analysis assistant. Analyze the following email and provide a comprehensive assessment.
-
-Email Details:
-From: ${email.from}
-Subject: ${email.subject}
-Body: ${email.body}
-
-Please provide your analysis in the following JSON format (return ONLY valid JSON, no markdown formatting):
-{
-  "summary": "A concise 1-2 sentence summary of the email",
-  "category": "one of: urgent, important, work, personal, promotions, spam, newsletter, social, uncategorized",
-  "priority": "one of: critical, high, medium, low, trash",
-  "sentiment": "one of: positive, neutral, negative",
-  "actionRequired": true or false,
-  "keyPoints": ["key point 1", "key point 2"],
-  "suggestedResponse": "A brief suggested response if action is required, or empty string if not",
-  "confidence": 0.95
-}
+        const systemPrompt = `You are an advanced email analysis assistant. Analyze emails and provide comprehensive assessments in JSON format.
 
 Category Guidelines:
 - "urgent": Time-sensitive emails requiring immediate attention
@@ -63,37 +46,72 @@ Priority Guidelines:
 - "low": FYI emails, newsletters
 - "trash": Spam, non-essential content`;
 
+        const userPrompt = `Analyze this email:
+
+From: ${email.from}
+Subject: ${email.subject}
+Body: ${email.body}`;
+
         try {
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [{ text: prompt }]
-                }]
-              })
-            }
-          );
+          const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash',
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              tools: [{
+                type: 'function',
+                function: {
+                  name: 'analyze_email',
+                  description: 'Analyze email and return structured data',
+                  parameters: {
+                    type: 'object',
+                    properties: {
+                      summary: { type: 'string', description: 'A concise 1-2 sentence summary' },
+                      category: { 
+                        type: 'string', 
+                        enum: ['urgent', 'important', 'work', 'personal', 'promotions', 'spam', 'newsletter', 'social', 'uncategorized']
+                      },
+                      priority: { 
+                        type: 'string', 
+                        enum: ['critical', 'high', 'medium', 'low', 'trash']
+                      },
+                      sentiment: { 
+                        type: 'string', 
+                        enum: ['positive', 'neutral', 'negative']
+                      },
+                      actionRequired: { type: 'boolean' },
+                      confidence: { type: 'number', description: 'Confidence score 0-1' }
+                    },
+                    required: ['summary', 'category', 'priority', 'sentiment', 'actionRequired', 'confidence'],
+                    additionalProperties: false
+                  }
+                }
+              }],
+              tool_choice: { type: 'function', function: { name: 'analyze_email' } }
+            })
+          });
 
           if (!response.ok) {
-            console.error('Gemini API error:', await response.text());
+            const errorText = await response.text();
+            console.error('Lovable AI error:', response.status, errorText);
             throw new Error('Failed to analyze email');
           }
 
           const data = await response.json();
-          const text = data.candidates[0].content.parts[0].text;
+          const toolCall = data.choices[0]?.message?.tool_calls?.[0];
           
-          // Clean markdown if present
-          let cleanedText = text.trim();
-          if (cleanedText.startsWith('```json')) {
-            cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-          } else if (cleanedText.startsWith('```')) {
-            cleanedText = cleanedText.replace(/```\n?/g, '');
+          if (!toolCall) {
+            throw new Error('No tool call in response');
           }
 
-          const analysis = JSON.parse(cleanedText);
+          const analysis = JSON.parse(toolCall.function.arguments);
 
           return {
             id: email.id,
