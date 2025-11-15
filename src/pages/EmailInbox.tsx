@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { EmailCard } from "@/components/email/EmailCard";
 import { EmailFilters } from "@/components/email/EmailFilters";
 import { mockEmails } from "@/data/mockEmails";
-import { geminiService } from "@/services/geminiService";
+import { supabase } from "@/integrations/supabase/client";
 import type { Email, EmailCategory, EmailPriority } from "@/types/email";
 import { RefreshCw, Search, Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -46,31 +46,20 @@ export const EmailInbox = () => {
     });
 
     try {
-      const analysisMap = await geminiService.analyzeBatchEmails(emails);
-      
-      const updatedEmails = emails.map(email => {
-        const analysis = analysisMap.get(email.id);
-        if (analysis) {
-          return {
-            ...email,
-            summary: analysis.summary,
-            category: analysis.category,
-            priority: analysis.priority,
-            sentiment: analysis.sentiment,
-            actionRequired: analysis.actionRequired,
-            confidence: analysis.confidence,
-          };
-        }
-        return email;
+      const { data, error } = await supabase.functions.invoke('analyze-email', {
+        body: { emails }
       });
 
-      setEmails(updatedEmails);
-      applyFilters(updatedEmails, selectedCategory, selectedPriority, searchQuery);
-      updateCategoryCounts(updatedEmails);
+      if (error) throw error;
+
+      const analyzedEmails = data.analyzedEmails;
+      setEmails(analyzedEmails);
+      applyFilters(analyzedEmails, selectedCategory, selectedPriority, searchQuery);
+      updateCategoryCounts(analyzedEmails);
 
       toast({
         title: "Analysis complete!",
-        description: `Successfully analyzed ${analysisMap.size} emails.`,
+        description: `Successfully analyzed ${analyzedEmails.length} emails.`,
       });
     } catch (error) {
       console.error('Failed to analyze emails:', error);
