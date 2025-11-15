@@ -116,6 +116,7 @@ export type Database = {
           confidence: number | null
           created_at: string | null
           date: string
+          email_type: string | null
           from_email: string
           id: string
           priority: string | null
@@ -135,6 +136,7 @@ export type Database = {
           confidence?: number | null
           created_at?: string | null
           date?: string
+          email_type?: string | null
           from_email: string
           id?: string
           priority?: string | null
@@ -154,6 +156,7 @@ export type Database = {
           confidence?: number | null
           created_at?: string | null
           date?: string
+          email_type?: string | null
           from_email?: string
           id?: string
           priority?: string | null

@@ -25,6 +25,7 @@ export const EmailInbox = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isInserting, setIsInserting] = useState(false);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const [emailView, setEmailView] = useState<'inbox' | 'sent'>('inbox');
   const { toast } = useToast();
 
   // Check authentication
@@ -43,18 +44,19 @@ export const EmailInbox = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch emails from database when user is authenticated
+  // Fetch emails from database when user is authenticated or view changes
   useEffect(() => {
     if (user) {
       fetchEmails();
     }
-  }, [user]);
+  }, [user, emailView]);
 
   const fetchEmails = async () => {
     try {
       const { data, error } = await supabase
         .from("emails")
         .select("*")
+        .eq("email_type", emailView)
         .order("date", { ascending: false });
 
       if (error) throw error;
@@ -298,6 +300,7 @@ export const EmailInbox = () => {
         date: new Date(email.date).toISOString(),
         read: email.read,
         starred: email.starred,
+        email_type: 'inbox',
       }));
 
       const { error: insertError } = await supabase
@@ -396,15 +399,19 @@ export const EmailInbox = () => {
             </Button>
           </div>
 
-          <Separator />
+          {emailView === 'inbox' && (
+            <>
+              <Separator />
 
-          <EmailFilters
-            selectedCategory={selectedCategory}
-            selectedPriority={selectedPriority}
-            onCategoryChange={handleCategoryChange}
-            onPriorityChange={handlePriorityChange}
-            categoryCounts={categoryCounts}
-          />
+              <EmailFilters
+                selectedCategory={selectedCategory}
+                selectedPriority={selectedPriority}
+                onCategoryChange={handleCategoryChange}
+                onPriorityChange={handlePriorityChange}
+                categoryCounts={categoryCounts}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -413,10 +420,36 @@ export const EmailInbox = () => {
         {/* Header */}
         <div className="border-b border-border bg-card p-6">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-foreground">Email Inbox</h1>
+            <h1 className="text-3xl font-bold text-foreground">
+              {emailView === 'inbox' ? 'Email Inbox' : 'Sent Emails'}
+            </h1>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>{filteredEmails.length} emails</span>
             </div>
+          </div>
+
+          {/* Inbox/Sent Tabs */}
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant={emailView === 'inbox' ? 'default' : 'outline'}
+              onClick={() => {
+                setEmailView('inbox');
+                setSelectedCategory('all');
+                setSelectedPriority('all');
+              }}
+            >
+              Inbox
+            </Button>
+            <Button
+              variant={emailView === 'sent' ? 'default' : 'outline'}
+              onClick={() => {
+                setEmailView('sent');
+                setSelectedCategory('all');
+                setSelectedPriority('all');
+              }}
+            >
+              Sent
+            </Button>
           </div>
 
           {/* Search Bar */}
@@ -438,7 +471,9 @@ export const EmailInbox = () => {
               <div className="text-center py-12">
                 <p className="text-muted-foreground">
                   {emails.length === 0 
-                    ? "No emails yet. Compose a new email to get started!"
+                    ? emailView === 'inbox' 
+                      ? "No emails yet. Compose a new email to get started!"
+                      : "No sent emails yet."
                     : "No emails match your filters."}
                 </p>
               </div>

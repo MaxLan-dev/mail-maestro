@@ -72,6 +72,7 @@ export const EmailResponseDialog = ({
         body,
         read: true,
         starred: false,
+        email_type: 'sent',
       });
 
       if (insertError) throw insertError;
