@@ -7,7 +7,7 @@ import { EmailCard } from "@/components/email/EmailCard";
 import { EmailFilters } from "@/components/email/EmailFilters";
 import { supabase } from "@/integrations/supabase/client";
 import type { Email, EmailCategory, EmailPriority } from "@/types/email";
-import { Search, Loader2, Sparkles, LogOut, Database, Calendar } from "lucide-react";
+import { Search, Loader2, Sparkles, LogOut, Database, Calendar, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ComposeEmail } from "@/components/email/ComposeEmail";
 import { AuthForm } from "@/components/auth/AuthForm";
@@ -387,6 +387,15 @@ export const EmailInbox = () => {
               >
                 <Calendar className="mr-2 h-4 w-4" />
                 Calendar
+              </Button>
+            </Link>
+            <Link to="/tasks" className="block">
+              <Button 
+                variant="outline"
+                className="w-full"
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Tasks
               </Button>
             </Link>
             <Button 

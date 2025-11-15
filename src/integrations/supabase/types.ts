@@ -192,6 +192,103 @@ export type Database = {
         }
         Relationships: []
       }
+      task_corrections: {
+        Row: {
+          corrected_values: Json
+          correction_type: string
+          created_at: string | null
+          id: string
+          original_extraction: Json
+          task_id: string | null
+          user_id: string
+        }
+        Insert: {
+          corrected_values: Json
+          correction_type: string
+          created_at?: string | null
+          id?: string
+          original_extraction: Json
+          task_id?: string | null
+          user_id: string
+        }
+        Update: {
+          corrected_values?: Json
+          correction_type?: string
+          created_at?: string | null
+          id?: string
+          original_extraction?: Json
+          task_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_corrections_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          ai_confidence: number | null
+          assignee: string | null
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          due_date: string | null
+          email_id: string | null
+          id: string
+          snooze_until: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          urgency: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_confidence?: number | null
+          assignee?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          email_id?: string | null
+          id?: string
+          snooze_until?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          urgency?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_confidence?: number | null
+          assignee?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          email_id?: string | null
+          id?: string
+          snooze_until?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          urgency?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_email_id_fkey"
+            columns: ["email_id"]
+            isOneToOne: false
+            referencedRelation: "emails"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
