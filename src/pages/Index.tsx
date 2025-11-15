@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { EmailCard, Email } from "@/components/EmailCard";
@@ -226,6 +227,12 @@ const Index = () => {
       </div>
     </div>
   );
+=======
+import { EmailInbox } from "./EmailInbox";
+
+const Index = () => {
+  return <EmailInbox />;
+>>>>>>> Stashed changes
 };
 
 export default Index;
