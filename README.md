@@ -41,6 +41,7 @@ An intelligent email management application powered by Google's Gemini 2.0 Flash
 
 **URL**: https://lovable.dev/projects/c89f4c9f-6eea-4b49-98ba-ae93663bb3a5
 
+
 ## How can I edit this code?
 
 There are several ways of editing your application.
@@ -50,6 +51,7 @@ There are several ways of editing your application.
 Simply visit the [Lovable Project](https://lovable.dev/projects/c89f4c9f-6eea-4b49-98ba-ae93663bb3a5) and start prompting.
 
 Changes made via Lovable will be committed automatically to this repo.
+
 
 **Use your preferred IDE**
 
@@ -108,6 +110,7 @@ The Gemini API key is configured in `src/config/gemini.ts`. For production use, 
 2. Add your API key: `VITE_GEMINI_API_KEY=your_api_key_here`
 3. The application will automatically use the environment variable if available
 
+
 ## Usage
 
 1. Click the **"Analyze with AI"** button to process all emails with Gemini AI
@@ -124,14 +127,19 @@ This application uses **Gemini 2.0 Flash**, Google's latest and fastest AI model
 - Cost-effective processing
 - Accurate categorization and summarization
 
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/c89f4c9f-6eea-4b49-98ba-ae93663bb3a5) and click on Share -> Publish.
 
 ## Can I connect a custom domain to my Lovable project?
 
-Yes, you can!
+
+Yes, you can
 
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+
+
