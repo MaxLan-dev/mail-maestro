@@ -2,6 +2,19 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+/**
+ * Supabase client configuration.
+ * 
+ * Environment variables required:
+ * - VITE_SUPABASE_URL: Your Supabase project URL
+ * - VITE_SUPABASE_PUBLISHABLE_KEY: Your Supabase anon/public key
+ * 
+ * The client is configured with:
+ * - localStorage for session persistence
+ * - Automatic session refresh
+ * - Type-safe database access via generated types
+ */
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -10,8 +23,8 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
+    storage: localStorage,        // Persist auth state in browser localStorage
+    persistSession: true,         // Keep user logged in across page refreshes
+    autoRefreshToken: true,       // Automatically refresh expired tokens
   }
 });
