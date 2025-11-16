@@ -127,7 +127,6 @@ This application uses **Gemini 2.0 Flash**, Google's latest and fastest AI model
 - Cost-effective processing
 - Accurate categorization and summarization
 
-
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/c89f4c9f-6eea-4b49-98ba-ae93663bb3a5) and click on Share -> Publish.
