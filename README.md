@@ -110,7 +110,6 @@ The Gemini API key is configured in `src/config/gemini.ts`. For production use, 
 2. Add your API key: `VITE_GEMINI_API_KEY=your_api_key_here`
 3. The application will automatically use the environment variable if available
 
-
 ## Usage
 
 1. Click the **"Analyze with AI"** button to process all emails with Gemini AI
